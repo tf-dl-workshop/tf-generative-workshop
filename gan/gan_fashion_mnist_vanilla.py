@@ -95,8 +95,8 @@ mnist = input_data.read_data_sets('../data/fashion_mnist', one_hot=True)
 sess = tf.Session()
 sess.run(tf.global_variables_initializer())
 
-if not os.path.exists('../out/'):
-    os.makedirs('../out/')
+if not os.path.exists('out2/'):
+    os.makedirs('out2/')
 
 i = 0
 
@@ -105,7 +105,7 @@ for it in range(1000000):
         samples = sess.run(G_sample, feed_dict={Z: sample_Z(16, Z_dim)})
 
         fig = plot(samples)
-        plt.savefig('out/{}.png'.format(str(i).zfill(3)), bbox_inches='tight')
+        plt.savefig('out2/{}.png'.format(str(i).zfill(3)), bbox_inches='tight')
         i += 1
         plt.close(fig)
 
