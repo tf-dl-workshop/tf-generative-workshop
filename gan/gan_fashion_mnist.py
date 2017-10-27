@@ -38,15 +38,16 @@ class GANs(object):
                 d1 = tf.layers.dense(x, 128, activation=tf.nn.relu,
                                      kernel_initializer=self.initializer)
                 d_logit = tf.layers.dense(d1, 1, activation=None, kernel_initializer=self.initializer)
-                return d_logit
+                d_prob = tf.nn.sigmoid(d_logit)
+                return d_prob, d_logit
 
         # logit output from discriminator for real example
-        D_logit_real = discriminator(self.x)
+        D_prob_real, D_logit_real = discriminator(self.x)
 
         # generate fake sample from generator
         self.g_sample = geneartor(self.z)
         # logit output from discriminator for fake example
-        D_logit_fake = discriminator(self.g_sample, reuse=True)
+        D_prob_fake, D_logit_fake = discriminator(self.g_sample, reuse=True)
 
         # Defining losses
         D_loss_real = tf.reduce_mean(
