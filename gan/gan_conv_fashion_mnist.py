@@ -9,8 +9,6 @@ class GANs(object):
         self.z_dim = z_dim
         self.image_dim = image_dim
         self.batch_size = 128
-        self.generator_dim = 512
-        self.discriminator_dim = 256
         self.learning_rate = 0.0002
         self.initializer = tf.contrib.layers.xavier_initializer()
 
@@ -29,9 +27,9 @@ class GANs(object):
             # Architecture : (64)4c2s-(128)4c2s_BL-FC1024_BL-FC1_S
             with tf.variable_scope("discriminator", reuse=reuse):
                 net = lrelu(conv2d(x, 64, 4, 4, 2, 2, name='d_conv1'))
-                net = lrelu(conv2d(net, 64, 4, 4, 2, 2, name='d_conv2'))
+                net = lrelu(bn(conv2d(net, 128, 4, 4, 2, 2, name='d_conv2'), is_training=is_training, scope='d_bn2'))
                 net = tf.reshape(net, [self.batch_size, -1])
-                net = lrelu(linear(net, 128, scope='d_fc3'))
+                net = lrelu(bn(linear(net, 1024, scope='d_fc3'), is_training=is_training, scope='d_bn3'))
                 out_logit = linear(net, 1, scope='d_fc4')
 
                 return out_logit
@@ -40,12 +38,14 @@ class GANs(object):
             # Network Architecture is exactly same as in infoGAN (https://arxiv.org/abs/1606.03657)
             # Architecture : FC1024_BR-FC7x7x128_BR-(64)4dc2s_BR-(1)4dc2s_S
             with tf.variable_scope("generator", reuse=reuse):
-                net = tf.nn.relu(linear(z, 256, scope='g_fc1'))
-                net = tf.nn.relu(linear(net, 64 * 7 * 7, scope='g_fc2'))
-                net = tf.reshape(net, [self.batch_size, 7, 7, 64])
-                net = tf.nn.relu(deconv2d(net, [self.batch_size, 14, 14, 64], 4, 4, 2, 2, name='g_dc3'))
-                out = tf.nn.sigmoid(deconv2d(net, [self.batch_size, 28, 28, 1], 4, 4, 2, 2, name='g_dc4'))
+                net = tf.nn.relu(bn(linear(z, 1024, scope='g_fc1'), is_training=is_training, scope='g_bn1'))
+                net = tf.nn.relu(bn(linear(net, 128 * 7 * 7, scope='g_fc2'), is_training=is_training, scope='g_bn2'))
+                net = tf.reshape(net, [self.batch_size, 7, 7, 128])
+                net = tf.nn.relu(
+                    bn(deconv2d(net, [self.batch_size, 14, 14, 64], 4, 4, 2, 2, name='g_dc3'), is_training=is_training,
+                       scope='g_bn3'))
 
+                out = tf.nn.sigmoid(deconv2d(net, [self.batch_size, 28, 28, 1], 4, 4, 2, 2, name='g_dc4'))
                 return out
 
         # logit output from discriminator for real example
@@ -94,8 +94,8 @@ def main():
 
     i = 0
     for it in range(100000):
-        if it % 1000 == 0:
-            samples = sess.run(gan.fake_images, feed_dict={gan.z: sample_z(128, Z_dim)})
+        if it % 50 == 0:
+            samples = sess.run(gan.fake_images, feed_dict={gan.z: sample_z_uniform(128, Z_dim)})
 
             fig = plot(samples[:16])
             plt.savefig('outCV/{}.png'.format(str(i).zfill(3)), bbox_inches='tight')
@@ -105,10 +105,10 @@ def main():
         x_image, _ = f_mnist.train.next_batch(batch_size)
 
         _, D_loss_curr = sess.run([gan.D_train_op, gan.D_loss],
-                                  feed_dict={gan.x: x_image, gan.z: sample_z(batch_size, Z_dim)})
-        _, G_loss_curr = sess.run([gan.G_train_op, gan.G_loss], feed_dict={gan.z: sample_z(batch_size, Z_dim)})
+                                  feed_dict={gan.x: x_image, gan.z: sample_z_uniform(batch_size, Z_dim)})
+        _, G_loss_curr = sess.run([gan.G_train_op, gan.G_loss], feed_dict={gan.z: sample_z_uniform(batch_size, Z_dim)})
 
-        if it % 1000 == 0:
+        if it % 50 == 0:
             print('Iter: {}'.format(it))
             print('D loss: {:.4}'.format(D_loss_curr))
             print('G_loss: {:.4}'.format(G_loss_curr))

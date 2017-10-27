@@ -4,8 +4,11 @@ import matplotlib.gridspec as gridspec
 import math
 import tensorflow as tf
 
-def sample_z(m, n):
+def sample_z_normal(m, n):
     return np.random.normal(size=[m, n])
+
+def sample_z_uniform(m, n):
+    return np.random.uniform(-1, 1, size=[m, n])
 
 
 def plot(samples):

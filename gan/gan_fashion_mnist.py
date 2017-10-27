@@ -8,8 +8,6 @@ class GANs(object):
     def __init__(self, z_dim, image_dim=28 * 28):
         self.z_dim = z_dim
         self.image_dim = image_dim
-        self.generator_dim = 512
-        self.discriminator_dim = 256
         self.learning_rate = 1e-4
         self.initializer = tf.contrib.layers.xavier_initializer()
 
@@ -24,24 +22,29 @@ class GANs(object):
 
         # Generator
         # Take Z as an input and produce fake sample (g_sample)
-        with tf.variable_scope("generator"):
-            g1 = tf.layers.dense(self.z, self.generator_dim, activation=tf.nn.relu,
-                                 kernel_initializer=self.initializer)
-            self.g_sample = tf.layers.dense(g1, self.image_dim, activation=tf.nn.sigmoid,
-                                            kernel_initializer=self.initializer)
+        def geneartor(z, reuse=False):
+            with tf.variable_scope("generator", reuse=reuse):
+                g1 = tf.layers.dense(z, 128, activation=tf.nn.relu,
+                                     kernel_initializer=self.initializer)
+                g_prob = tf.layers.dense(g1, self.image_dim, activation=tf.nn.sigmoid,
+                                         kernel_initializer=self.initializer)
+
+                return g_prob
 
         # Discriminator
         # A classifier returning probability of being a real example
         def discriminator(x, reuse=False):
             with tf.variable_scope("discriminator", reuse=reuse):
-                d1 = tf.layers.dense(x, self.discriminator_dim, activation=tf.nn.relu,
+                d1 = tf.layers.dense(x, 128, activation=tf.nn.relu,
                                      kernel_initializer=self.initializer)
-                d1_dropout = tf.layers.dropout(d1, rate=0.0)
-                d_logit = tf.layers.dense(d1_dropout, 1, activation=None, kernel_initializer=self.initializer)
+                d_logit = tf.layers.dense(d1, 1, activation=None, kernel_initializer=self.initializer)
                 return d_logit
 
         # logit output from discriminator for real example
         D_logit_real = discriminator(self.x)
+
+        # generate fake sample from generator
+        self.g_sample = geneartor(self.z)
         # logit output from discriminator for fake example
         D_logit_fake = discriminator(self.g_sample, reuse=True)
 
@@ -67,11 +70,11 @@ class GANs(object):
 
 def main():
     batch_size = 128
-    Z_dim = 128
+    z_dim = 128
 
     f_mnist = input_data.read_data_sets('../data/fashion_mnist', one_hot=True)
 
-    gan = GANs(Z_dim)
+    gan = GANs(z_dim)
 
     sess = tf.Session()
     sess.run(tf.global_variables_initializer())
@@ -82,7 +85,7 @@ def main():
     i = 0
     for it in range(100000):
         if it % 1000 == 0:
-            samples = sess.run(gan.g_sample, feed_dict={gan.z: sample_z(16, Z_dim)})
+            samples = sess.run(gan.g_sample, feed_dict={gan.z: sample_z_uniform(16, z_dim)})
 
             fig = plot(samples)
             plt.savefig('out/{}.png'.format(str(i).zfill(3)), bbox_inches='tight')
@@ -92,8 +95,8 @@ def main():
         x_image, _ = f_mnist.train.next_batch(batch_size)
 
         _, D_loss_curr = sess.run([gan.D_train_op, gan.D_loss],
-                                  feed_dict={gan.x: x_image, gan.z: sample_z(batch_size, Z_dim)})
-        _, G_loss_curr = sess.run([gan.G_train_op, gan.G_loss], feed_dict={gan.z: sample_z(batch_size, Z_dim)})
+                                  feed_dict={gan.x: x_image, gan.z: sample_z_uniform(batch_size, z_dim)})
+        _, G_loss_curr = sess.run([gan.G_train_op, gan.G_loss], feed_dict={gan.z: sample_z_uniform(batch_size, z_dim)})
 
         if it % 1000 == 0:
             print('Iter: {}'.format(it))

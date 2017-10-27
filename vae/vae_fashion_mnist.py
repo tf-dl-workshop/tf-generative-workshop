@@ -6,8 +6,6 @@ from utils import *
 
 class VariantionalAutoencoder(object):
     def __init__(self, latent_dim, image_dim=28 * 28):
-        self.hidden_encoder_dim = 256
-        self.hidden_decoder_dim = 256
         self.latent_dim = latent_dim
         self.learning_rate = 1e-2
 
@@ -20,18 +18,18 @@ class VariantionalAutoencoder(object):
 
         # Gaussian MLP as encoder
         with tf.variable_scope("gaussian_MLP_encoder"):
-            he1 = tf.layers.dense(self.x, self.hidden_encoder_dim, activation=tf.nn.relu)
-            he2 = tf.layers.dense(he1, self.hidden_encoder_dim, activation=tf.nn.relu)
+            he1 = tf.layers.dense(self.x, 256, activation=tf.nn.relu)
+            he2 = tf.layers.dense(he1, 256, activation=tf.nn.relu)
             z_mu = tf.layers.dense(he2, self.latent_dim, activation=None)
             z_log_sigma = tf.layers.dense(he2, self.latent_dim, activation=None)
 
             eps = tf.random_normal(tf.shape(z_mu), 0, 1, dtype=tf.float32)
             self.z = z_mu + tf.exp(z_log_sigma * 0.5) * eps
 
-        # Bernolli MLP as decoder
+        # Bernoulli MLP as decoder
         with tf.variable_scope("bernoulli_MLP_decoder"):
-            hd1 = tf.layers.dense(self.z, self.hidden_decoder_dim, activation=tf.nn.relu)
-            hd2 = tf.layers.dense(hd1, self.hidden_decoder_dim, activation=tf.nn.relu)
+            hd1 = tf.layers.dense(self.z, 256, activation=tf.nn.relu)
+            hd2 = tf.layers.dense(hd1, 256, activation=tf.nn.relu)
             self.x_hat = tf.layers.dense(hd2, self.image_dim, activation=tf.nn.sigmoid)
 
         with tf.variable_scope("loss"):
@@ -70,7 +68,7 @@ def main():
     i = 0
     for it in range(100000):
         if it % 1000 == 0:
-            samples = sess.run(vae.x_hat, feed_dict={vae.z: sample_z(16, latent_dim)})
+            samples = sess.run(vae.x_hat, feed_dict={vae.z: sample_z_uniform(16, latent_dim)})
 
             fig = plot(samples)
             plt.savefig('out/{}.png'.format(str(i).zfill(3)), bbox_inches='tight')
