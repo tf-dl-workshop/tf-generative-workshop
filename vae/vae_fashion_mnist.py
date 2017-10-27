@@ -28,6 +28,7 @@ class VariantionalAutoencoder(object):
             eps = tf.random_normal(tf.shape(z_mu), 0, 1, dtype=tf.float32)
             self.z = z_mu + tf.exp(z_log_sigma * 0.5) * eps
 
+        # Bernolli MLP as decoder
         with tf.variable_scope("bernoulli_MLP_decoder"):
             hd1 = tf.layers.dense(self.z, self.hidden_decoder_dim, activation=tf.nn.relu)
             hd2 = tf.layers.dense(hd1, self.hidden_decoder_dim, activation=tf.nn.relu)
@@ -50,7 +51,6 @@ class VariantionalAutoencoder(object):
             self.total_loss = tf.reduce_mean(recon_loss + latent_loss)
             self.train_op = tf.train.AdamOptimizer(
                 learning_rate=self.learning_rate).minimize(self.total_loss)
-        return
 
 
 def main():

@@ -8,42 +8,51 @@ class GANs(object):
     def __init__(self, z_dim, image_dim=28 * 28):
         self.z_dim = z_dim
         self.image_dim = image_dim
+        self.batch_size = 128
         self.generator_dim = 512
         self.discriminator_dim = 256
-        self.learning_rate = 1e-4
+        self.learning_rate = 0.0002
         self.initializer = tf.contrib.layers.xavier_initializer()
 
         self.build_model()
 
     def build_model(self):
         # Noise input Z
-        self.z = tf.placeholder(tf.float32, shape=[None, self.z_dim])
+        self.z = tf.placeholder(tf.float32, shape=[self.batch_size, self.z_dim])
 
         # Input Image
-        self.x = tf.placeholder(tf.float32, shape=[None, self.image_dim])
+        self.x = tf.placeholder(tf.float32, shape=[self.batch_size, self.image_dim])
+        self.image = tf.reshape(self.x, [self.batch_size, 28, 28, 1])
 
-        # Generator
-        # Take Z as an input and produce fake sample (g_sample)
-        with tf.variable_scope("generator"):
-            g1 = tf.layers.dense(self.z, self.generator_dim, activation=tf.nn.relu,
-                                 kernel_initializer=self.initializer)
-            self.g_sample = tf.layers.dense(g1, self.image_dim, activation=tf.nn.sigmoid,
-                                            kernel_initializer=self.initializer)
-
-        # Discriminator
-        # A classifier returning probability of being a real example
-        def discriminator(x, reuse=False):
+        def discriminator(x, is_training=True, reuse=False):
+            # Network Architecture is exactly same as in infoGAN (https://arxiv.org/abs/1606.03657)
+            # Architecture : (64)4c2s-(128)4c2s_BL-FC1024_BL-FC1_S
             with tf.variable_scope("discriminator", reuse=reuse):
-                d1 = tf.layers.dense(x, self.discriminator_dim, activation=tf.nn.relu,
-                                     kernel_initializer=self.initializer)
-                d1_dropout = tf.layers.dropout(d1, rate=0.0)
-                d_logit = tf.layers.dense(d1_dropout, 1, activation=None, kernel_initializer=self.initializer)
-                return d_logit
+                net = lrelu(conv2d(x, 64, 4, 4, 2, 2, name='d_conv1'))
+                net = lrelu(conv2d(net, 64, 4, 4, 2, 2, name='d_conv2'))
+                net = tf.reshape(net, [self.batch_size, -1])
+                net = lrelu(linear(net, 128, scope='d_fc3'))
+                out_logit = linear(net, 1, scope='d_fc4')
+
+                return out_logit
+
+        def generator(z, is_training=True, reuse=False):
+            # Network Architecture is exactly same as in infoGAN (https://arxiv.org/abs/1606.03657)
+            # Architecture : FC1024_BR-FC7x7x128_BR-(64)4dc2s_BR-(1)4dc2s_S
+            with tf.variable_scope("generator", reuse=reuse):
+                net = tf.nn.relu(linear(z, 256, scope='g_fc1'))
+                net = tf.nn.relu(linear(net, 64 * 7 * 7, scope='g_fc2'))
+                net = tf.reshape(net, [self.batch_size, 7, 7, 64])
+                net = tf.nn.relu(deconv2d(net, [self.batch_size, 14, 14, 64], 4, 4, 2, 2, name='g_dc3'))
+                out = tf.nn.sigmoid(deconv2d(net, [self.batch_size, 28, 28, 1], 4, 4, 2, 2, name='g_dc4'))
+
+                return out
 
         # logit output from discriminator for real example
-        D_logit_real = discriminator(self.x)
-        # logit output from discriminator for fake example
-        D_logit_fake = discriminator(self.g_sample, reuse=True)
+        D_logit_real = discriminator(self.image, True)
+        # output of D for fake images
+        G = generator(self.z, is_training=True, reuse=False)
+        D_logit_fake = discriminator(G, is_training=True, reuse=True)
 
         # Defining losses
         D_loss_real = tf.reduce_mean(
@@ -64,6 +73,10 @@ class GANs(object):
         self.D_train_op = tf.train.AdamOptimizer(self.learning_rate).minimize(self.D_loss, var_list=D_var_list)
         self.G_train_op = tf.train.AdamOptimizer(self.learning_rate).minimize(self.G_loss, var_list=G_var_list)
 
+        """" Testing """
+        # for test
+        self.fake_images = generator(self.z, is_training=False, reuse=True)
+
 
 def main():
     batch_size = 128
@@ -76,16 +89,16 @@ def main():
     sess = tf.Session()
     sess.run(tf.global_variables_initializer())
 
-    if not os.path.exists('out/'):
-        os.makedirs('out/')
+    if not os.path.exists('outCV/'):
+        os.makedirs('outCV/')
 
     i = 0
     for it in range(100000):
         if it % 1000 == 0:
-            samples = sess.run(gan.g_sample, feed_dict={gan.z: sample_z(16, Z_dim)})
+            samples = sess.run(gan.fake_images, feed_dict={gan.z: sample_z(128, Z_dim)})
 
-            fig = plot(samples)
-            plt.savefig('out/{}.png'.format(str(i).zfill(3)), bbox_inches='tight')
+            fig = plot(samples[:16])
+            plt.savefig('outCV/{}.png'.format(str(i).zfill(3)), bbox_inches='tight')
             i += 1
             plt.close(fig)
 
