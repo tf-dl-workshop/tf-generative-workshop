@@ -68,7 +68,7 @@ def main():
     i = 0
     for it in range(100000):
         if it % 1000 == 0:
-            samples = sess.run(vae.x_hat, feed_dict={vae.z: sample_z_uniform(16, latent_dim)})
+            samples = sess.run(vae.x_hat, feed_dict={vae.z: sample_z(16, latent_dim)})
 
             fig = plot(samples)
             plt.savefig('out/{}.png'.format(str(i).zfill(3)), bbox_inches='tight')
